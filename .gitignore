@@ -5,4 +5,6 @@ TrainLogs
 TestLogs
 __pycache__
 Model.pth
-out
+Model
+Temp
+fakeTrain

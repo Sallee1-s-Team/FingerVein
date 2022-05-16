@@ -9,8 +9,8 @@ from Loader import *
 
 if __name__ == '__main__':
   #参数
-  learn_rate = 1e-4   #学习率
-  batch = 150   #批大小
+  learn_rate = 1e-5   #学习率
+  batch = 100   #批大小
 
   #部署GPU
   device = torch.device("cuda")
@@ -47,7 +47,7 @@ if __name__ == '__main__':
   logWriter = SummaryWriter("TrainLogs")
 
   i = 0
-  minLoss = np.inf       #最小损失
+  maxRt = 0         #最小损失
   wait = 0          #超时次数
   maxwait = 5       #最大超时
   while(True):
@@ -113,8 +113,8 @@ if __name__ == '__main__':
     
     logWriter.add_scalar("Test RT",rightRate,i)
     #检测是否要停止训练
-    if(Avgloss < minLoss):
-      minLoss = Avgloss
+    if(rightRate > maxRt):
+      maxRt = rightRate
       wait = 0
       torch.save(myModel.state_dict(),"Model.pth")    #每训练一轮保存一次参数
     else:
