@@ -10,15 +10,16 @@ from Loader import *
 if __name__ == '__main__':
   #参数
   learn_rate = 1e-5   #学习率
-  batch = 100   #批大小
+  miniBatch = 50     #批大小
+  miniBatchCount = 10  #梯度累加次数
 
   #部署GPU
   device = torch.device("cuda")
   #数据
-  trainSet = FingerVainDataSet("Train")
-  verifySet = FingerVainDataSet("Test")
-  trainLoader= DataLoader(trainSet,batch,shuffle=True,num_workers=0,drop_last=True)
-  verifyLoader = DataLoader(verifySet,batch,shuffle=False)
+  trainSet = FingerVainDataSet("Train",prePorcess=False,fakeTrain=True)      #如果做过预处理将prePorcess设置为False
+  verifySet = FingerVainDataSet("Test",prePorcess=False,fakeTrain=False)     #如果做过预处理将prePorcess设置为False
+  trainLoader= DataLoader(trainSet,miniBatch,shuffle=True,num_workers=0,drop_last=True)
+  verifyLoader = DataLoader(verifySet,miniBatch,shuffle=False)
 
   trainLen = len(trainSet)
   verifyLen = len(verifySet)
@@ -26,10 +27,17 @@ if __name__ == '__main__':
   #模型
   #myModel = MnistModel()
   myModel = torchvision.models.vgg16()
+  #将模型中的ReLU换成mish
+  # for i in range(len(myModel.features)):
+  #   if isinstance(myModel.features[i],nn.ReLU):
+  #     myModel.features[i] = nn.Mish(inplace=True)
+  # for i in range(len(myModel.classifier)):
+  #   if isinstance(myModel.classifier[i],nn.ReLU):
+  #     myModel.classifier[i] = nn.Mish(inplace=True)
+
   myModel.classifier[6] = nn.Linear(4096,312)
   print(myModel)
   myModel = myModel.to(device)
-  
   #代价函数
   lossFn = nn.CrossEntropyLoss()
   lossFn = lossFn.to(device)
@@ -49,25 +57,42 @@ if __name__ == '__main__':
   i = 0
   maxRt = 0         #最小损失
   wait = 0          #超时次数
-  maxwait = 5       #最大超时
+  maxwait = 10       #最大超时
+
   while(True):
+    optimizer.zero_grad()   #清除上一次最后累计的梯度
     myModel.train(True)
     print(f"==========第{i+1}轮训练开始==========")
     i+=1
+    batchCount = trainLen // miniBatch    #计算有多少个batch，用来计算进度
+    batchi = 0           #用来计算进度
+    miniBatchNo = 1      #梯度累加次数
+    totalLoss = 0       #梯度累加的总梯度
     for data in trainLoader:
       imgs,targets = data
       imgs = imgs.to(device)
       targets = targets.to(device)
       outputs = myModel(imgs)
-      Avgloss = lossFn(outputs,targets)
-      #写日志
-      logWriter.add_scalar("train Loss",Avgloss,train_step)
-      #优化模型
-      optimizer.zero_grad()
-      Avgloss.backward()
-      optimizer.step()
-      scheduler.step(Avgloss)
-      train_step+=1
+      AvgLoss = lossFn(outputs,targets)
+      AvgLoss = AvgLoss / miniBatchCount
+      totalLoss += AvgLoss
+      #梯度累加&优化模型
+      AvgLoss.backward()
+      if(miniBatchNo < miniBatchCount):
+        miniBatchNo+=1
+      else:
+        logWriter.add_scalar("train Loss",totalLoss,train_step)
+        optimizer.step()
+        scheduler.step(totalLoss)
+        optimizer.zero_grad()
+        miniBatchNo = 1
+        totalLoss = 0
+        train_step+=1
+      batchi+=1
+      print(f"\r训练中，进度{(batchi / batchCount)*100:.2f}%",flush=True,end="")
+    print()
+
+
 
     myModel.train(False)
     print("正在计算训练集准确度")
@@ -76,6 +101,8 @@ if __name__ == '__main__':
     trainRightRate = 0
     trainRightCount = 0
     with torch.no_grad():
+      batchCount = trainLen // miniBatch
+      batchi = 0        #用来输出测试进度
       for data in trainLoader:
         imgs,targets = data
         imgs = imgs.to(device)
@@ -85,8 +112,11 @@ if __name__ == '__main__':
         trainRightCount += torch.sum(result==targets)     #和标签比较
         loss = lossFn(outputs,targets)                    #代价函数
         trainTotalLoss+=loss
+        batchi += 1
+        print(f"\r测试中，进度{(batchi / batchCount)*100:.2f}%",flush=True,end="")
+      print()
       trainRightRate = trainRightCount/trainLen*100
-      trainAvgLoss = trainTotalLoss/(trainLen/batch)
+      trainAvgLoss = trainTotalLoss/(trainLen/miniBatch)
     print(f"训练损失:{trainAvgLoss:.3f}，正确率：{trainRightRate:.2f}%")
     logWriter.add_scalar("Train RT",trainRightRate,i)
 
@@ -97,6 +127,8 @@ if __name__ == '__main__':
     rightRate = 0     #正确率
     rightCount = 0
     with torch.no_grad():
+      batchCount = verifyLen // miniBatch + 1
+      batchi = 0        #用来输出测试进度
       for data in verifyLoader:
         imgs,targets = data
         imgs = imgs.to(device)
@@ -107,9 +139,12 @@ if __name__ == '__main__':
         loss = lossFn(outputs,targets)              #代价函数
         logWriter.add_images("Test data",imgs,train_step)
         totalLoss+=loss
+        batchi += 1
+        print(f"\r测试中，进度{(batchi / batchCount)*100:.2f}%",flush=True,end="")
+      print()
       rightRate = rightCount/verifyLen*100
-      Avgloss = totalLoss/(verifyLen/batch)
-    print(f"验证损失:{Avgloss:.3f}，正确率：{rightRate:.2f}%")
+      AvgLoss = totalLoss/(verifyLen/miniBatch)
+    print(f"验证损失:{AvgLoss:.3f}，正确率：{rightRate:.2f}%")
     
     logWriter.add_scalar("Test RT",rightRate,i)
     #检测是否要停止训练
