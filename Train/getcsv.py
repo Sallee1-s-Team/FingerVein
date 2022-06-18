@@ -13,7 +13,7 @@ def getFileList(root:str,REpattern:str):
   return Filterfiles
 
 if __name__ == "__main__":
-  FileLists = getFileList(".",r".+\.bmp$")
+  FileLists = getFileList("data/",r".+\.bmp$")
   head = ["person","simple","finger","times"]
 
   with open("allData.csv","w",encoding="utf8",newline="")as csvFile:

@@ -41,4 +41,4 @@ with open("../Test/data.csv","r",encoding="utf8") as testFp:
   next(testReader)
 
   for row in testReader:
-    shutil.move(f"{row[0]}_{row[1]}_{row[2]}_{row[3]}_roi.bmp","../Test/")
+    shutil.move(f"data/{row[0]}_{row[1]}_{row[2]}_{row[3]}_roi.bmp","../Test/data")

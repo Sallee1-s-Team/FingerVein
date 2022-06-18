@@ -14,8 +14,8 @@ fakeTrain/*
 !fakeTrain/*.py
 !fakeTrain/*.csv
 
-TrainLogs
-TestLogs
+TrainLog[s]
+TestLog[s]
 
 __pycache__
 

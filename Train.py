@@ -6,11 +6,12 @@ from torch.utils.tensorboard import SummaryWriter
 from torch import nn
 #from MyModel import MnistModel
 from Loader import *
+from myModel import MyModel
 
 if __name__ == '__main__':
   #参数
-  learn_rate = 1e-5   #学习率
-  miniBatch = 50     #批大小
+  learn_rate = 1e-3   #学习率
+  miniBatch = 50      #批大小
   miniBatchCount = 10  #梯度累加次数
 
   #部署GPU
@@ -25,25 +26,25 @@ if __name__ == '__main__':
   verifyLen = len(verifySet)
 
   #模型
-  #myModel = MnistModel()
-  myModel = torchvision.models.vgg16()
-  #将模型中的ReLU换成mish
-  # for i in range(len(myModel.features)):
-  #   if isinstance(myModel.features[i],nn.ReLU):
-  #     myModel.features[i] = nn.Mish(inplace=True)
-  # for i in range(len(myModel.classifier)):
-  #   if isinstance(myModel.classifier[i],nn.ReLU):
-  #     myModel.classifier[i] = nn.Mish(inplace=True)
+  fingerModel = MyModel()
+  #fingerModel = torchvision.models.vgg16()
+  #将vgg16模型中的ReLU换成mish
+  # for i in range(len(fingerModel.features)):
+  #   if isinstance(fingerModel.features[i],nn.ReLU):
+  #     fingerModel.features[i] = nn.Mish(inplace=True)
+  # for i in range(len(fingerModel.classifier)):
+  #   if isinstance(fingerModel.classifier[i],nn.ReLU):
+  #     fingerModel.classifier[i] = nn.Mish(inplace=True)
 
-  myModel.classifier[6] = nn.Linear(4096,312)
-  print(myModel)
-  myModel = myModel.to(device)
+  fingerModel.classifier[-1] = nn.Linear(512,312)
+  print(fingerModel)
+  fingerModel = fingerModel.to(device)
   #代价函数
   lossFn = nn.CrossEntropyLoss()
   lossFn = lossFn.to(device)
 
   #优化器
-  optimizer = torch.optim.Adam(myModel.parameters(),lr = learn_rate)
+  optimizer = torch.optim.Adam(fingerModel.parameters(),lr = learn_rate)
   scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode="min",factor=0.5,patience=100,verbose=True)
 
   #参数
@@ -51,8 +52,8 @@ if __name__ == '__main__':
   tset_step = 0
 
   #写训练日志
-  shutil.rmtree("TrainLogs",ignore_errors=True)
-  logWriter = SummaryWriter("TrainLogs")
+  shutil.rmtree("TrainLog",ignore_errors=True)
+  logWriter = SummaryWriter("TrainLog")
 
   i = 0
   maxRt = 0         #最小损失
@@ -61,7 +62,7 @@ if __name__ == '__main__':
 
   while(True):
     optimizer.zero_grad()   #清除上一次最后累计的梯度
-    myModel.train(True)
+    fingerModel.train(True)
     print(f"==========第{i+1}轮训练开始==========")
     i+=1
     batchCount = trainLen // miniBatch    #计算有多少个batch，用来计算进度
@@ -72,7 +73,7 @@ if __name__ == '__main__':
       imgs,targets = data
       imgs = imgs.to(device)
       targets = targets.to(device)
-      outputs = myModel(imgs)
+      outputs = fingerModel(imgs)
       AvgLoss = lossFn(outputs,targets)
       AvgLoss = AvgLoss / miniBatchCount
       totalLoss += AvgLoss
@@ -94,7 +95,7 @@ if __name__ == '__main__':
 
 
 
-    myModel.train(False)
+    fingerModel.train(False)
     print("正在计算训练集准确度")
     trainTotalLoss = 0
     trainAvgLoss = 0
@@ -107,7 +108,7 @@ if __name__ == '__main__':
         imgs,targets = data
         imgs = imgs.to(device)
         targets = targets.to(device)
-        outputs = myModel(imgs)                           #跑训练集
+        outputs = fingerModel(imgs)                           #跑训练集
         result = torch.argmax(outputs,1)                  #取最大值
         trainRightCount += torch.sum(result==targets)     #和标签比较
         loss = lossFn(outputs,targets)                    #代价函数
@@ -119,7 +120,6 @@ if __name__ == '__main__':
       trainAvgLoss = trainTotalLoss/(trainLen/miniBatch)
     print(f"训练损失:{trainAvgLoss:.3f}，正确率：{trainRightRate:.2f}%")
     logWriter.add_scalar("Train RT",trainRightRate,i)
-
 
     print("正在计算验证集准确度")
     totalLoss = 0     #总损失
@@ -133,7 +133,7 @@ if __name__ == '__main__':
         imgs,targets = data
         imgs = imgs.to(device)
         targets = targets.to(device)
-        outputs = myModel(imgs)                     #跑验证集
+        outputs = fingerModel(imgs)                     #跑验证集
         result = torch.argmax(outputs,1)            #取最大值
         rightCount += torch.sum(result==targets)    #和标签比较
         loss = lossFn(outputs,targets)              #代价函数
@@ -151,7 +151,7 @@ if __name__ == '__main__':
     if(rightRate > maxRt):
       maxRt = rightRate
       wait = 0
-      torch.save(myModel.state_dict(),"Model.pth")    #每训练一轮保存一次参数
+      torch.save(fingerModel.state_dict(),"Model.pth")    #每训练一轮保存一次参数
     else:
       wait+=1
       if(wait == maxwait):

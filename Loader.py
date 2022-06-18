@@ -13,6 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 from matplotlib import pyplot
 #from MyModel import MnistModel
 
+
 class FingerVainDataSet(Dataset):
   def __init__(self,rootDir,prePorcess = True,fakeTrain = True) -> None:
     self.rootDir = rootDir
@@ -23,7 +24,7 @@ class FingerVainDataSet(Dataset):
       reader = csv.reader(csvFile)
       next(reader)            #读掉表头
       for row in reader:
-        self.FileList.append((f"{self.rootDir}/{row[0]}_{row[1]}_{row[2]}_{row[3]}_roi.bmp",(int(row[0])-1)*2+int(row[2][1])-1))  #样本编号成数字，其中每两个编号代表一个人的两个不同的手指
+        self.FileList.append((f"{self.rootDir}/data/{row[0]}_{row[1]}_{row[2]}_{row[3]}_roi.bmp",(int(row[0])-1)*2+int(row[2][1])-1))  #样本编号成数字，其中每两个编号代表一个人的两个不同的手指
 
     self.lenFileList = len(self.FileList);i = 0
 
@@ -31,7 +32,8 @@ class FingerVainDataSet(Dataset):
       # 预处理，放在临时文件夹里
       shutil.rmtree(f"Temp/{self.rootDir}",ignore_errors=True)
       if(f"Temp/{rootDir}" not in os.listdir("Temp")):
-        os.mkdir(f"Temp/{rootDir}")      
+        os.makedirs(f"Temp/{rootDir}/data",exist_ok=True)
+              
       for file in self.FileList:
         img = cv2.imread(file[0],flags=0)
         img = self.__imgPreprocess(img)     #实际预处理代码
@@ -48,13 +50,13 @@ class FingerVainDataSet(Dataset):
         reader = csv.reader(csvFile)
         next(reader)            #读掉表头
         for row in reader:
-          self.fakeFileList.append((f"fakeTrain/fake_{row[0]}_{row[1]}_{row[2]}.bmp",(int(row[0])-1)*2+int(row[1][1])-1))  #样本编号成数字，其中每两个编号代表一个人
+          self.fakeFileList.append((f"fakeTrain/data/fake_{row[0]}_{row[1]}_{row[2]}.bmp",(int(row[0])-1)*2+int(row[1][1])-1))  #样本编号成数字，其中每两个编号代表一个人
       self.lenFakeFileList = len(self.fakeFileList);i = 0
       if(prePorcess == True):
         # 预处理，放在临时文件夹里
         shutil.rmtree(f"Temp/fakeTrain",ignore_errors=True)
         if(f"Temp/fakeTrain" not in os.listdir("Temp")):
-          os.mkdir(f"Temp/fakeTrain")      
+          os.makedirs(f"Temp/fakeTrain/data",exist_ok=True)      
         for file in self.fakeFileList:
           img = cv2.imread(file[0],flags=0)
           img = self.__imgPreprocess(img)     #实际预处理代码
@@ -107,18 +109,17 @@ class FingerVainDataSet(Dataset):
 if __name__ == '__main__':
   #参数
   miniBatch = 64   #批大小
-  #数据te
-  trainSet = FingerVainDataSet("Train",prePorcess=False,fakeTrain=False)
-  trainLoader= DataLoader(trainSet,miniBatch,shuffle=True,num_workers=0,drop_last=True)
+  #数据
+  trainSet = FingerVainDataSet("Train",prePorcess=False,fakeTrain=True)
+  trainLoader= DataLoader(trainSet,miniBatch,shuffle=False,num_workers=0,drop_last=True)
 
   trainLen = len(trainSet)
 
   shutil.rmtree("LoaderLogs",ignore_errors=True)
   logWriter = SummaryWriter("LoaderLogs")
+  step = 0
   for miniBatch in trainLoader:
-    #浮点转整型
-    imgs = miniBatch[0].type(torch.int8)
-    logWriter.add_images("train images",imgs,1)
-    break
+    logWriter.add_images("train images",miniBatch[0],step)
+    step+=1
   logWriter.close()
   exit(0)

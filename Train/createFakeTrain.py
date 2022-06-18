@@ -8,8 +8,8 @@ import PIL
 
 class fakeTrain:
   @staticmethod
-  def createFakeTrain():
-    with open(f"../Train/data.csv") as realFile:
+  def createFakeTrain(fakeImgCount = 100):
+    with open(f"data.csv") as realFile:
       realCsv = csv.reader(realFile,skipinitialspace=True)
       next(realCsv)
       samples = {}
@@ -24,11 +24,11 @@ class fakeTrain:
       #根据现有文件数量扩增
       for groupImg in samples.values():
         count = len(groupImg)
-        for i in range(count,100):
+        for i in range(count,fakeImgCount):
           item = groupImg[i%count]
-          fileName = f"../Train/{item[0]}_{item[1]}_{item[2]}_{item[3]}_roi.bmp"
+          fileName = f"data/{item[0]}_{item[1]}_{item[2]}_{item[3]}_roi.bmp"
           img = cv2.imread(fileName)
-          cv2.imwrite(f"fake_{item[0]}_{item[2]}_{i}.bmp",fakeTrain.makeFakeImg(img))
+          cv2.imwrite(f"../fakeTrain/data/fake_{item[0]}_{item[2]}_{i}.bmp",fakeTrain.makeFakeImg(img))
     
     fakeTrain.getCsv()
 
@@ -62,7 +62,7 @@ class fakeTrain:
     
     fileLists = getFileList(".",r".+\.bmp$")
 
-    with open("data.csv","w",encoding="utf8",newline="")as csvFile:
+    with open("../fakeTrain/data.csv","w",encoding="utf8",newline="")as csvFile:
       csvWriter = csv.writer(csvFile)
       head = ["person","finger","simple"]
       csvWriter.writerow(head)
@@ -73,5 +73,5 @@ class fakeTrain:
 
 
 if __name__ == "__main__":
-  fakeTrain.createFakeTrain()
+  fakeTrain.createFakeTrain(30)
   fakeTrain.getCsv()

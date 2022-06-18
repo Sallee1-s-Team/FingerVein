@@ -8,17 +8,20 @@ import numpy as np
 import skimage.morphology as mp
 import torch
 import torchvision
+
+from myModel import MyModel
 from torch import nn
 from matplotlib import pyplot
 
 class fingerVainRec:
   # 如果需要打包成单独的程序，则需要手动提供模型路径
   # 以下代码摘自Loader.py,Test.py
-  def __init__(self,modelPath="../Models/叠图+假数据+梯度累计.pth"):
+  def __init__(self,modelPath="../Models/myModel.pth"):
     # 模型
     self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    self.myModel = torchvision.models.vgg16()
-    self.myModel.classifier[6] = nn.Linear(4096,312)
+    self.myModel = MyModel()
+    
+    self.myModel.classifier[6] = nn.Linear(512,312)
     self.myModel.load_state_dict(torch.load(modelPath))
     self.myModel = self.myModel.to(self.device)
     self.myModel.train(False)
